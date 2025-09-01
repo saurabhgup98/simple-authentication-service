@@ -1,4 +1,5 @@
 import User from '../models/User.js';
+import RefreshToken from '../models/RefreshToken.js';
 import { generateTokenPair, revokeRefreshToken, revokeAllRefreshTokens } from '../utils/jwt.js';
 import { generateEmailVerificationToken, generatePasswordResetToken } from '../utils/jwt.js';
 import { sendEmail } from '../utils/email.js';
