@@ -20,8 +20,14 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Connect to database
-connectDB();
+// Connect to database with error handling
+connectDB().catch((error) => {
+  console.error('Database connection failed:', error);
+  // Don't exit in serverless environment
+  if (process.env.VERCEL !== '1') {
+    process.exit(1);
+  }
+});
 
 // Security middleware
 app.use(helmet({
@@ -88,7 +94,21 @@ app.get('/', (req, res) => {
     message: 'Simple Authentication Service is running!',
     status: 'OK',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    vercel: process.env.VERCEL === '1',
+    nodeVersion: process.version
+  });
+});
+
+// Simple test endpoint (no database required)
+app.get('/test', (req, res) => {
+  res.status(200).json({
+    message: 'Test endpoint working!',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    hasMongoUri: !!process.env.MONGODB_URI,
+    hasJwtSecret: !!process.env.JWT_SECRET,
+    allowedOrigins: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000']
   });
 });
 
@@ -149,6 +169,16 @@ app.get('/api', (req, res) => {
       }
     },
     documentation: 'Use Postman to test these endpoints'
+  });
+});
+
+// Global error handler to prevent crashes
+app.use((err, req, res, next) => {
+  console.error('Global error handler:', err);
+  res.status(500).json({
+    success: false,
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
   });
 });
 
