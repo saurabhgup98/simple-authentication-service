@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vercel Backend Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .response {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success {
+            border-color: #28a745;
+            background-color: #d4edda;
+        }
+        .error {
+            border-color: #dc3545;
+            background-color: #f8d7da;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            background-color: #e9ecef;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px 5px 0 0;
+            margin-right: 5px;
+        }
+        .tab.active {
+            background-color: #007bff;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Vercel Backend Test</h1>
+        
+        <div class="form-group">
+            <label for="vercelUrl">Vercel URL:</label>
+            <input type="text" id="vercelUrl" placeholder="https://your-app-name.vercel.app" value="https://your-app-name.vercel.app">
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('health')">Health Check</button>
+            <button class="tab" onclick="showTab('register')">Register</button>
+            <button class="tab" onclick="showTab('login')">Login</button>
+            <button class="tab" onclick="showTab('profile')">Profile</button>
+        </div>
+
+        <!-- Health Check Tab -->
+        <div id="health" class="tab-content active">
+            <h3>🏥 Health Check</h3>
+            <button onclick="testHealth()">Test Health Endpoint</button>
+            <div id="healthResponse" class="response"></div>
+        </div>
+
+        <!-- Register Tab -->
+        <div id="register" class="tab-content">
+            <h3>👤 User Registration</h3>
+            <div class="form-group">
+                <label for="regName">Name:</label>
+                <input type="text" id="regName" value="Test User">
+            </div>
+            <div class="form-group">
+                <label for="regEmail">Email:</label>
+                <input type="email" id="regEmail" value="test@example.com">
+            </div>
+            <div class="form-group">
+                <label for="regPassword">Password:</label>
+                <input type="password" id="regPassword" value="TestPass123!">
+            </div>
+            <button onclick="testRegister()">Register User</button>
+            <div id="registerResponse" class="response"></div>
+        </div>
+
+        <!-- Login Tab -->
+        <div id="login" class="tab-content">
+            <h3>🔐 User Login</h3>
+            <div class="form-group">
+                <label for="loginEmail">Email:</label>
+                <input type="email" id="loginEmail" value="test@example.com">
+            </div>
+            <div class="form-group">
+                <label for="loginPassword">Password:</label>
+                <input type="password" id="loginPassword" value="TestPass123!">
+            </div>
+            <button onclick="testLogin()">Login</button>
+            <div id="loginResponse" class="response"></div>
+        </div>
+
+        <!-- Profile Tab -->
+        <div id="profile" class="tab-content">
+            <h3>🔒 User Profile (Protected Route)</h3>
+            <div class="form-group">
+                <label for="accessToken">Access Token:</label>
+                <textarea id="accessToken" rows="3" placeholder="Paste your access token here"></textarea>
+            </div>
+            <button onclick="testProfile()">Get Profile</button>
+            <div id="profileResponse" class="response"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentTab = 'health';
+
+        function showTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+            
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+            
+            currentTab = tabName;
+        }
+
+        function getVercelUrl() {
+            return document.getElementById('vercelUrl').value;
+        }
+
+        function showResponse(elementId, data, isError = false) {
+            const element = document.getElementById(elementId);
+            element.textContent = JSON.stringify(data, null, 2);
+            element.className = 'response ' + (isError ? 'error' : 'success');
+        }
+
+        async function makeRequest(url, options = {}) {
+            try {
+                const response = await fetch(url, {
+                    method: options.method || 'GET',
+                    headers: options.headers || {},
+                    body: options.body
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || `HTTP ${response.status}`);
+                }
+                
+                return data;
+            } catch (error) {
+                throw error;
+            }
+        }
+
+        async function testHealth() {
+            try {
+                const url = getVercelUrl();
+                const response = await makeRequest(`${url}/health`);
+                showResponse('healthResponse', response);
+            } catch (error) {
+                showResponse('healthResponse', { error: error.message }, true);
+            }
+        }
+
+        async function testRegister() {
+            try {
+                const url = getVercelUrl();
+                const name = document.getElementById('regName').value;
+                const email = document.getElementById('regEmail').value;
+                const password = document.getElementById('regPassword').value;
+                
+                const response = await makeRequest(`${url}/api/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email, password })
+                });
+                
+                showResponse('registerResponse', response);
+                
+                // Auto-fill access token if available
+                if (response.data?.tokens?.accessToken) {
+                    document.getElementById('accessToken').value = response.data.tokens.accessToken;
+                }
+            } catch (error) {
+                showResponse('registerResponse', { error: error.message }, true);
+            }
+        }
+
+        async function testLogin() {
+            try {
+                const url = getVercelUrl();
+                const email = document.getElementById('loginEmail').value;
+                const password = document.getElementById('loginPassword').value;
+                
+                const response = await makeRequest(`${url}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                showResponse('loginResponse', response);
+                
+                // Auto-fill access token if available
+                if (response.data?.tokens?.accessToken) {
+                    document.getElementById('accessToken').value = response.data.tokens.accessToken;
+                }
+            } catch (error) {
+                showResponse('loginResponse', { error: error.message }, true);
+            }
+        }
+
+        async function testProfile() {
+            try {
+                const url = getVercelUrl();
+                const accessToken = document.getElementById('accessToken').value;
+                
+                if (!accessToken) {
+                    showResponse('profileResponse', { error: 'Access token is required' }, true);
+                    return;
+                }
+                
+                const response = await makeRequest(`${url}/api/user/profile`, {
+                    method: 'GET',
+                    headers: { 
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                showResponse('profileResponse', response);
+            } catch (error) {
+                showResponse('profileResponse', { error: error.message }, true);
+            }
+        }
+    </script>
+</body>
+</html>
