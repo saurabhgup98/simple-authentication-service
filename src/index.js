@@ -53,7 +53,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// Rate limiting
+// Rate limiting - DISABLED FOR DEVELOPMENT
+// Uncomment and configure these for production deployment
+/*
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
@@ -80,6 +82,9 @@ const authLimiter = rateLimit({
 });
 
 app.use('/api/auth/', authLimiter);
+*/
+
+console.log('Rate limiting DISABLED for development');
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -108,7 +113,13 @@ app.get('/test', (req, res) => {
     environment: process.env.NODE_ENV || 'development',
     hasMongoUri: !!process.env.MONGODB_URI,
     hasJwtSecret: !!process.env.JWT_SECRET,
-    allowedOrigins: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000']
+    allowedOrigins: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
+    rateLimiting: 'DISABLED for development',
+    oauth: {
+      google: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+      facebook: !!(process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET),
+      github: !!(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET)
+    }
   });
 });
 
