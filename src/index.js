@@ -82,6 +82,16 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Initialize Passport
 app.use(passport.initialize());
 
+// Root endpoint
+app.get('/', (req, res) => {
+  res.status(200).json({
+    message: 'Simple Authentication Service is running!',
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({
@@ -146,12 +156,14 @@ app.get('/api', (req, res) => {
 app.use(notFound);
 app.use(errorHandler);
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Authentication service running on port ${PORT}`);
-  console.log(`📚 API Documentation: http://localhost:${PORT}/api`);
-  console.log(`🏥 Health Check: http://localhost:${PORT}/health`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-});
+// Start server only if not in Vercel environment
+if (process.env.NODE_ENV !== 'production' || process.env.VERCEL !== '1') {
+  app.listen(PORT, () => {
+    console.log(`🚀 Authentication service running on port ${PORT}`);
+    console.log(`📚 API Documentation: http://localhost:${PORT}/api`);
+    console.log(`🏥 Health Check: http://localhost:${PORT}/health`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
+}
 
 export default app;
