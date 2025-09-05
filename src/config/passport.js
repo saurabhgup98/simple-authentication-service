@@ -4,13 +4,14 @@ import { Strategy as FacebookStrategy } from 'passport-facebook';
 import { Strategy as GitHubStrategy } from 'passport-github2';
 import User from '../models/User.js';
 
-// Google OAuth Strategy
-passport.use(new GoogleStrategy({
-  clientID: process.env.GOOGLE_CLIENT_ID,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  callbackURL: `${process.env.BACKEND_URL}/api/oauth/google/callback`,
-  scope: ['profile', 'email']
-}, async (accessToken, refreshToken, profile, done) => {
+// Google OAuth Strategy (only if credentials are provided)
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/oauth/google/callback`,
+    scope: ['profile', 'email']
+  }, async (accessToken, refreshToken, profile, done) => {
   try {
     // Check if user already exists
     let user = await User.findOne({ googleId: profile.id });
@@ -53,15 +54,19 @@ passport.use(new GoogleStrategy({
     console.error('Google Strategy error:', error);
     return done(error, null);
   }
-}));
+  }));
+} else {
+  console.log('Google OAuth not configured - missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET');
+}
 
-// Facebook OAuth Strategy
-passport.use(new FacebookStrategy({
-  clientID: process.env.FACEBOOK_APP_ID,
-  clientSecret: process.env.FACEBOOK_APP_SECRET,
-  callbackURL: `${process.env.BACKEND_URL}/api/oauth/facebook/callback`,
-  profileFields: ['id', 'displayName', 'photos', 'email']
-}, async (accessToken, refreshToken, profile, done) => {
+// Facebook OAuth Strategy (only if credentials are provided)
+if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
+  passport.use(new FacebookStrategy({
+    clientID: process.env.FACEBOOK_APP_ID,
+    clientSecret: process.env.FACEBOOK_APP_SECRET,
+    callbackURL: `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/oauth/facebook/callback`,
+    profileFields: ['id', 'displayName', 'photos', 'email']
+  }, async (accessToken, refreshToken, profile, done) => {
   try {
     // Check if user already exists
     let user = await User.findOne({ facebookId: profile.id });
@@ -104,15 +109,19 @@ passport.use(new FacebookStrategy({
     console.error('Facebook Strategy error:', error);
     return done(error, null);
   }
-}));
+  }));
+} else {
+  console.log('Facebook OAuth not configured - missing FACEBOOK_APP_ID or FACEBOOK_APP_SECRET');
+}
 
-// GitHub OAuth Strategy
-passport.use(new GitHubStrategy({
-  clientID: process.env.GITHUB_CLIENT_ID,
-  clientSecret: process.env.GITHUB_CLIENT_SECRET,
-  callbackURL: `${process.env.BACKEND_URL}/api/oauth/github/callback`,
-  scope: ['user:email']
-}, async (accessToken, refreshToken, profile, done) => {
+// GitHub OAuth Strategy (only if credentials are provided)
+if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
+  passport.use(new GitHubStrategy({
+    clientID: process.env.GITHUB_CLIENT_ID,
+    clientSecret: process.env.GITHUB_CLIENT_SECRET,
+    callbackURL: `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/oauth/github/callback`,
+    scope: ['user:email']
+  }, async (accessToken, refreshToken, profile, done) => {
   try {
     // Check if user already exists
     let user = await User.findOne({ githubId: profile.id });
@@ -158,7 +167,10 @@ passport.use(new GitHubStrategy({
     console.error('GitHub Strategy error:', error);
     return done(error, null);
   }
-}));
+  }));
+} else {
+  console.log('GitHub OAuth not configured - missing GITHUB_CLIENT_ID or GITHUB_CLIENT_SECRET');
+}
 
 // Serialize user for session
 passport.serializeUser((user, done) => {
