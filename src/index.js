@@ -42,7 +42,11 @@ app.use(helmet({
 }));
 
 // CORS configuration
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'];
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
+  'http://localhost:3000',
+  'https://food-delivery-app-frontend.vercel.app',
+  'https://food-delivery-business-app-sera.vercel.app'
+];
 console.log('CORS Allowed Origins:', allowedOrigins);
 console.log('Environment:', process.env.NODE_ENV);
 
