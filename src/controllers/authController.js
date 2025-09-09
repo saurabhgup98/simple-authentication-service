@@ -9,25 +9,64 @@ import { sendEmail } from '../utils/email.js';
 // @access  Public
 export const register = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, appName, role } = req.body;
+
+    // Validate appName and role
+    const validApps = [
+      'https://food-delivery-app-frontend.vercel.app',
+      'https://food-delivery-business-app-sera.vercel.app'
+    ];
+    const validRoles = ['user', 'business-user', 'admin', 'superadmin'];
+
+    if (!appName || !validApps.includes(appName)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid app name. Must be a valid app URL.'
+      });
+    }
+
+    if (!role || !validRoles.includes(role)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid role. Must be one of: user, business-user, admin, superadmin'
+      });
+    }
 
     // Check if user already exists
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        error: 'User with this email already exists'
-      });
+      // If user exists, add new app registration
+      if (!existingUser.hasAccessToApp(appName)) {
+        await existingUser.addAppRegistration(appName, role);
+        
+        // Generate tokens for existing user
+        const { accessToken, refreshToken } = await generateTokenPair(existingUser._id);
+        
+        return res.status(200).json({
+          success: true,
+          message: 'App access added to existing account',
+          data: {
+            user: existingUser.toPublicJSON(),
+            tokens: { accessToken, refreshToken }
+          }
+        });
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: 'User already has access to this app'
+        });
+      }
     }
 
     // Generate email verification token
     const emailVerificationToken = generateEmailVerificationToken();
 
-    // Create user
+    // Create new user
     const user = await User.create({
       name,
       email: email.toLowerCase(),
       password,
+      appRegistered: [{ name: appName, role }],
       emailVerificationToken,
       emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
     });
@@ -81,7 +120,20 @@ export const register = async (req, res) => {
 // @access  Public
 export const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, appEndpoint } = req.body;
+
+    // Validate appEndpoint
+    const validApps = [
+      'https://food-delivery-app-frontend.vercel.app',
+      'https://food-delivery-business-app-sera.vercel.app'
+    ];
+
+    if (!appEndpoint || !validApps.includes(appEndpoint)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid app endpoint. Must be a valid app URL.'
+      });
+    }
 
     // Find user by email
     const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
@@ -89,6 +141,14 @@ export const login = async (req, res) => {
       return res.status(401).json({
         success: false,
         error: 'Invalid email or password'
+      });
+    }
+
+    // Check if user has access to the requested app
+    if (!user.hasAccessToApp(appEndpoint)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied. You do not have permission to access this app.'
       });
     }
 
@@ -123,6 +183,9 @@ export const login = async (req, res) => {
     // Reset login attempts on successful login
     await user.resetLoginAttempts();
 
+    // Get role for the specific app
+    const role = user.getRoleForApp(appEndpoint);
+
     // Generate tokens
     const { accessToken, refreshToken } = await generateTokenPair(user._id);
 
@@ -135,7 +198,9 @@ export const login = async (req, res) => {
           name: user.name,
           email: user.email,
           emailVerified: user.emailVerified,
-          oauthProvider: user.oauthProvider
+          oauthProvider: user.oauthProvider,
+          role: role,
+          appEndpoint: appEndpoint
         },
         tokens: {
           accessToken,

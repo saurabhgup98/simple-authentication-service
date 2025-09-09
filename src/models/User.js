@@ -26,6 +26,23 @@ const userSchema = new mongoose.Schema({
     maxlength: [100, 'Name cannot exceed 100 characters']
   },
   
+  // App Registration
+  appRegistered: [{
+    name: {
+      type: String,
+      required: true,
+      enum: [
+        'https://food-delivery-app-frontend.vercel.app',
+        'https://food-delivery-business-app-sera.vercel.app'
+      ]
+    },
+    role: {
+      type: String,
+      required: true,
+      enum: ['user', 'business-user', 'admin', 'superadmin']
+    }
+  }],
+  
   // Account Status
   isActive: {
     type: Boolean,
@@ -187,6 +204,31 @@ userSchema.statics.findByEmailOrOAuthId = function(email, oauthId, provider) {
   }
   
   return this.findOne({ $or: [query] });
+};
+
+// Method to add app registration
+userSchema.methods.addAppRegistration = function(appName, role) {
+  // Check if app already exists
+  const existingApp = this.appRegistered.find(app => app.name === appName);
+  if (existingApp) {
+    // Update existing app role
+    existingApp.role = role;
+  } else {
+    // Add new app registration
+    this.appRegistered.push({ name: appName, role });
+  }
+  return this.save();
+};
+
+// Method to get role for specific app
+userSchema.methods.getRoleForApp = function(appName) {
+  const app = this.appRegistered.find(app => app.name === appName);
+  return app ? app.role : null;
+};
+
+// Method to check if user has access to app
+userSchema.methods.hasAccessToApp = function(appName) {
+  return this.appRegistered.some(app => app.name === appName);
 };
 
 // Method to get public profile (without sensitive data)
