@@ -9,6 +9,7 @@ import { sendEmail } from '../utils/email.js';
 // @access  Public
 export const register = async (req, res) => {
   try {
+    console.log('Registration attempt:', { name: req.body.name, email: req.body.email });
     const { name, email, password } = req.body;
 
     // Minimal validation - just check if fields are not empty
@@ -93,9 +94,15 @@ export const register = async (req, res) => {
     });
   } catch (error) {
     console.error('Registration error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
     res.status(500).json({
       success: false,
-      error: 'Registration failed'
+      error: 'Registration failed',
+      details: error.message
     });
   }
 };
