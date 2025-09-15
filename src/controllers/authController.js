@@ -3,6 +3,7 @@ import RefreshToken from '../models/RefreshToken.js';
 import { generateTokenPair, revokeRefreshToken, revokeAllRefreshTokens } from '../utils/jwt.js';
 import { generateEmailVerificationToken, generatePasswordResetToken } from '../utils/jwt.js';
 import { sendEmail } from '../utils/email.js';
+import { ensureConnection } from '../config/database.js';
 
 // @desc    Register user (Simplified for testing)
 // @route   POST /api/auth/register
@@ -37,6 +38,9 @@ export const register = async (req, res) => {
     // Set default values for testing
     const appName = 'https://food-delivery-app-frontend.vercel.app';
     const role = 'user';
+
+    // Ensure database connection
+    await ensureConnection();
 
     // Check if user already exists
     const existingUser = await User.findOne({ email: email.toLowerCase() });
