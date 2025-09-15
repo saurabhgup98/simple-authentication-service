@@ -19,8 +19,9 @@ const connectDB = async () => {
       useUnifiedTopology: true,
       serverSelectionTimeoutMS: 30000, // Increased timeout to 30s
       socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
-      bufferCommands: false, // Disable mongoose buffering
-      bufferMaxEntries: 0, // Disable mongoose buffering
+      maxPoolSize: 10, // Maintain up to 10 socket connections
+      serverSelectionRetryDelayMS: 5000, // Keep trying to send operations for 5 seconds
+      heartbeatFrequencyMS: 10000, // Send a ping every 10 seconds
     });
 
     console.log(`MongoDB Connected: ${conn.connection.host}`);
@@ -58,6 +59,14 @@ export const ensureConnection = async () => {
   if (mongoose.connection.readyState !== 1) {
     console.log('Database not connected, attempting to connect...');
     await connectDB();
+    // Wait for connection to be ready
+    await new Promise((resolve) => {
+      if (mongoose.connection.readyState === 1) {
+        resolve();
+      } else {
+        mongoose.connection.once('connected', resolve);
+      }
+    });
   }
 };
 
