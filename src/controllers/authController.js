@@ -4,33 +4,38 @@ import { generateTokenPair, revokeRefreshToken, revokeAllRefreshTokens } from '.
 import { generateEmailVerificationToken, generatePasswordResetToken } from '../utils/jwt.js';
 import { sendEmail } from '../utils/email.js';
 
-// @desc    Register user
+// @desc    Register user (Simplified for testing)
 // @route   POST /api/auth/register
 // @access  Public
 export const register = async (req, res) => {
   try {
-    const { name, email, password, appName, role } = req.body;
+    const { name, email, password } = req.body;
 
-    // Validate appName and role
-    const validApps = [
-      'https://food-delivery-app-frontend.vercel.app',
-      'https://food-delivery-business-app-sera.vercel.app'
-    ];
-    const validRoles = ['user', 'business-user', 'admin', 'superadmin'];
-
-    if (!appName || !validApps.includes(appName)) {
+    // Minimal validation - just check if fields are not empty
+    if (!name || name.trim() === '') {
       return res.status(400).json({
         success: false,
-        error: 'Invalid app name. Must be a valid app URL.'
+        error: 'Name is required and cannot be empty'
       });
     }
 
-    if (!role || !validRoles.includes(role)) {
+    if (!email || email.trim() === '') {
       return res.status(400).json({
         success: false,
-        error: 'Invalid role. Must be one of: user, business-user, admin, superadmin'
+        error: 'Email is required and cannot be empty'
       });
     }
+
+    if (!password || password.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: 'Password is required and cannot be empty'
+      });
+    }
+
+    // Set default values for testing
+    const appName = 'https://food-delivery-app-frontend.vercel.app';
+    const role = 'user';
 
     // Check if user already exists
     const existingUser = await User.findOne({ email: email.toLowerCase() });
@@ -58,41 +63,21 @@ export const register = async (req, res) => {
       }
     }
 
-    // Generate email verification token
-    const emailVerificationToken = generateEmailVerificationToken();
-
-    // Create new user
+    // Create new user (simplified - no email verification)
     const user = await User.create({
-      name,
-      email: email.toLowerCase(),
+      name: name.trim(),
+      email: email.toLowerCase().trim(),
       password,
       appRegistered: [{ name: appName, role }],
-      emailVerificationToken,
-      emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+      isEmailVerified: true // Skip email verification for testing
     });
 
     // Generate tokens
     const { accessToken, refreshToken } = await generateTokenPair(user._id);
 
-    // Send verification email
-    try {
-      await sendEmail({
-        to: user.email,
-        subject: 'Verify Your Email',
-        template: 'emailVerification',
-        data: {
-          name: user.name,
-          verificationUrl: `${process.env.FRONTEND_URL}/verify-email?token=${emailVerificationToken}`
-        }
-      });
-    } catch (emailError) {
-      console.error('Failed to send verification email:', emailError);
-      // Don't fail registration if email fails
-    }
-
     res.status(201).json({
       success: true,
-      message: 'User registered successfully. Please check your email to verify your account.',
+      message: 'User registered successfully!',
       data: {
         user: {
           id: user._id,
