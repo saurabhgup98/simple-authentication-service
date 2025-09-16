@@ -4,8 +4,9 @@ A minimal authentication service with basic registration and login functionality
 
 ## Features
 
-- User registration with username, email, and password
+- User registration with username, email, password, and role
 - User login with email and password
+- Role-based system with 4 roles: user, business-user, admin, superadmin
 - Password hashing with bcrypt
 - MongoDB Atlas integration
 - Simple validation (no null values)
@@ -47,9 +48,16 @@ Content-Type: application/json
 {
   "username": "johndoe",
   "email": "john@example.com",
-  "password": "password123"
+  "password": "password123",
+  "role": "user"
 }
 ```
+
+**Available Roles:**
+- `user` (default)
+- `business-user`
+- `admin`
+- `superadmin`
 
 ### Login User
 ```http
@@ -73,7 +81,8 @@ All responses follow this format:
     "user": {
       "id": "user_id",
       "username": "username",
-      "email": "email"
+      "email": "email",
+      "role": "user"
     }
   }
 }
@@ -89,7 +98,8 @@ All responses follow this format:
      {
        "username": "testuser",
        "email": "test@example.com",
-       "password": "testpass123"
+       "password": "testpass123",
+       "role": "user"
      }
      ```
 
