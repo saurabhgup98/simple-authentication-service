@@ -68,11 +68,21 @@ export const register = async (req, res) => {
     }
 
     const appIdentifier = getAppIdentifier(appEndpoint);
-    const role = 'user'; // Default role for new registrations
+    
+    // Assign role based on app type
+    let role = 'user'; // Default role
+    if (appIdentifier === 'sera-food-business-app') {
+      role = 'business-user'; // Business app users get business-user role
+    } else if (appIdentifier === 'sera-food-customer-app') {
+      role = 'user'; // Customer app users get user role
+    } else if (appIdentifier === 'todo-app') {
+      role = 'user'; // Todo app users get user role
+    }
     
     console.log('App validation:', {
       appEndpoint,
       appIdentifier,
+      role,
       isValid: isValidAppEndpoint(appEndpoint)
     });
 
