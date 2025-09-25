@@ -2,6 +2,14 @@ import passport from 'passport';
 
 // Google OAuth login
 export const googleLogin = (req, res, next) => {
+  // Check if Google OAuth is configured
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    return res.status(503).json({
+      success: false,
+      error: 'Google OAuth is not configured'
+    });
+  }
+  
   const { appEndpoint } = req.query;
   
   console.log('Google OAuth login request:', { appEndpoint });
@@ -17,6 +25,11 @@ export const googleLogin = (req, res, next) => {
 
 // Google OAuth callback
 export const googleCallback = (req, res, next) => {
+  // Check if Google OAuth is configured
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/error?message=${encodeURIComponent('Google OAuth is not configured')}`);
+  }
+  
   passport.authenticate('google', (err, user, info) => {
     if (err) {
       console.error('Google OAuth callback error:', err);
@@ -46,6 +59,14 @@ export const googleCallback = (req, res, next) => {
 // Get Google OAuth URL
 export const getGoogleAuthUrl = (req, res) => {
   try {
+    // Check if Google OAuth is configured
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+      return res.status(503).json({
+        success: false,
+        error: 'Google OAuth is not configured'
+      });
+    }
+    
     const { appEndpoint } = req.query;
     
     if (!appEndpoint) {

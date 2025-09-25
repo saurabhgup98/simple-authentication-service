@@ -40,20 +40,24 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Session configuration
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
-}));
+// Session configuration (only if SESSION_SECRET is provided)
+if (process.env.SESSION_SECRET) {
+  app.use(session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
+  }));
 
-// Initialize Passport
-app.use(passport.initialize());
-app.use(passport.session());
+  // Initialize Passport
+  app.use(passport.initialize());
+  app.use(passport.session());
+} else {
+  console.log('Session and Passport not configured - SESSION_SECRET not provided');
+}
 
 // Request logging
 app.use((req, res, next) => {
