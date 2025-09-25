@@ -15,7 +15,14 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: true
+    required: function() {
+      return !this.googleId; // Password not required if OAuth user
+    }
+  },
+  googleId: {
+    type: String,
+    sparse: true,
+    unique: true
   },
   appRegistered: [{
     appIdentifier: {
@@ -25,6 +32,12 @@ const userSchema = new mongoose.Schema({
     role: {
       type: String,
       required: true
+    },
+    authMethod: {
+      type: String,
+      required: true,
+      enum: ['email-password', 'google-oauth'],
+      default: 'email-password'
     },
     isActive: {
       type: Boolean,
@@ -61,16 +74,18 @@ userSchema.methods.getRoleForApp = function(appIdentifier) {
 };
 
 // Add app registration
-userSchema.methods.addAppRegistration = function(appIdentifier, role) {
+userSchema.methods.addAppRegistration = function(appIdentifier, role, authMethod = 'email-password') {
   const existingApp = this.appRegistered.find(app => app.appIdentifier === appIdentifier);
   
   if (existingApp) {
     existingApp.role = role;
+    existingApp.authMethod = authMethod;
     existingApp.isActive = true;
   } else {
     this.appRegistered.push({
       appIdentifier,
       role,
+      authMethod,
       isActive: true
     });
   }

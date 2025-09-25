@@ -54,7 +54,7 @@ export const register = async (req, res) => {
       }
       
       // Add app registration to existing user
-      await user.addAppRegistration(appIdentifier, userRole);
+      await user.addAppRegistration(appIdentifier, userRole, 'email-password');
     } else {
       // Create new user
       user = await User.create({
@@ -64,6 +64,7 @@ export const register = async (req, res) => {
         appRegistered: [{
           appIdentifier,
           role: userRole,
+          authMethod: 'email-password',
           isActive: true
         }]
       });

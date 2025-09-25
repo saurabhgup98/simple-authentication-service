@@ -1,8 +1,11 @@
 import express from 'express';
 import cors from 'cors';
+import session from 'express-session';
 import dotenv from 'dotenv';
 import connectDB from './config/database.js';
+import passport from './config/passport.js';
 import authRoutes from './routes/auth.js';
+import oauthRoutes from './routes/oauth.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { notFound } from './middleware/notFound.js';
 
@@ -37,6 +40,21 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Session configuration
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
+
 // Request logging
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
@@ -62,6 +80,7 @@ app.get('/health', (req, res) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/auth', oauthRoutes);
 
 // Error handling
 app.use(notFound);
