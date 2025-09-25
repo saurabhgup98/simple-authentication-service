@@ -18,6 +18,16 @@ const userSchema = new mongoose.Schema({
     sparse: true,
     unique: true
   },
+  facebookId: {
+    type: String,
+    sparse: true,
+    unique: true
+  },
+  githubId: {
+    type: String,
+    sparse: true,
+    unique: true
+  },
   appRegistered: [{
     appIdentifier: {
       type: String,
@@ -31,7 +41,7 @@ const userSchema = new mongoose.Schema({
     authMethod: {
       type: String,
       required: true,
-      enum: ['email-password', 'google-oauth'],
+      enum: ['email-password', 'google-oauth', 'facebook-oauth', 'github-oauth'],
       default: 'email-password'
     },
     password: {

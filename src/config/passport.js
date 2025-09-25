@@ -1,122 +1,103 @@
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
+import { Strategy as FacebookStrategy } from 'passport-facebook';
+import { Strategy as GitHubStrategy } from 'passport-github2';
 import User from '../models/User.js';
+import {
+    handleGoogleOAuth,
+    handleFacebookOAuth,
+    handleGitHubOAuth
+} from './oauthHandlers.js';
 
-// Only configure Google OAuth if environment variables are present
-if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-  passport.use(new GoogleStrategy({
-    clientID: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: process.env.GOOGLE_CALLBACK_URL || "/api/auth/google/callback"
-  }, async (accessToken, refreshToken, profile, done) => {
-  try {
-    console.log('Google OAuth profile:', profile);
-    
-    // Extract app endpoint from state parameter
-    const appEndpoint = profile.state || null;
-    
-    // Check if user already exists with this Google ID
-    let user = await User.findOne({ googleId: profile.id });
-    
-    if (user) {
-      // User exists, check if they have access to the requested app
-      if (appEndpoint) {
-        const { getAppIdentifier, isValidAppEndpoint } = await import('./appMapping.js');
-        
-        if (isValidAppEndpoint(appEndpoint)) {
-          const appIdentifier = getAppIdentifier(appEndpoint);
-          
-          if (!user.hasAccessToApp(appIdentifier)) {
-            // Add app registration
-            let role = 'user';
-            if (appIdentifier === 'sera-food-business-app') {
-              role = 'business-user';
-            }
-            await user.addAppRegistration(appIdentifier, role, 'google-oauth');
-          }
-        }
-      }
-      return done(null, user);
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
+
+const OAUTH_CONFIG = {
+    google: {
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: process.env.GOOGLE_CALLBACK_URL || "/api/auth/google/callback"
+    },
+    facebook: {
+        clientID: process.env.FACEBOOK_CLIENT_ID,
+        clientSecret: process.env.FACEBOOK_CLIENT_SECRET,
+        callbackURL: process.env.FACEBOOK_CALLBACK_URL || "/api/auth/facebook/callback"
+    },
+    github: {
+        clientID: process.env.GITHUB_CLIENT_ID,
+        clientSecret: process.env.GITHUB_CLIENT_SECRET,
+        callbackURL: process.env.GITHUB_CALLBACK_URL || "/api/auth/github/callback"
     }
-    
-    // Check if user exists with same email
-    user = await User.findOne({ email: profile.emails[0].value });
-    
-    if (user) {
-      // Link Google account to existing user
-      user.googleId = profile.id;
-      await user.save();
-      
-      // Add app registration if needed
-      if (appEndpoint) {
-        const { getAppIdentifier, isValidAppEndpoint } = await import('./appMapping.js');
-        
-        if (isValidAppEndpoint(appEndpoint)) {
-          const appIdentifier = getAppIdentifier(appEndpoint);
-          
-          if (!user.hasAccessToApp(appIdentifier)) {
-            let role = 'user';
-            if (appIdentifier === 'sera-food-business-app') {
-              role = 'business-user';
-            }
-            await user.addAppRegistration(appIdentifier, role, 'google-oauth');
-          }
-        }
-      }
-      
-      return done(null, user);
+};
+
+const isOAuthConfigured = (provider) => {
+    return OAUTH_CONFIG[provider].clientID && OAUTH_CONFIG[provider].clientSecret;
+};
+
+// ============================================================================
+// COMMON STRATEGY CONFIGURATION
+// ============================================================================
+
+const configureOAuthStrategy = (provider, StrategyClass, handler) => {
+    if (isOAuthConfigured(provider)) {
+        passport.use(new StrategyClass(OAUTH_CONFIG[provider], handler));
+        console.log(`${provider} OAuth strategy configured`);
+    } else {
+        console.log(`${provider} OAuth not configured - missing environment variables`);
     }
-    
-    // Create new user
-    const newUser = new User({
-      googleId: profile.id,
-      email: profile.emails[0].value,
-      username: profile.displayName,
-      appRegistered: []
+};
+
+// ============================================================================
+// PROVIDER-SPECIFIC CONFIGURATIONS (Simplified)
+// ============================================================================
+
+const configureGoogleStrategy = () => {
+    configureOAuthStrategy('google', GoogleStrategy, handleGoogleOAuth);
+};
+
+const configureFacebookStrategy = () => {
+    configureOAuthStrategy('facebook', FacebookStrategy, handleFacebookOAuth);
+};
+
+const configureGitHubStrategy = () => {
+    configureOAuthStrategy('github', GitHubStrategy, handleGitHubOAuth);
+};
+
+const configureSerialization = () => {
+    // Serialize user for session
+    passport.serializeUser((user, done) => {
+        done(null, user.id);
     });
-    
-    // Add app registration if appEndpoint provided
-    if (appEndpoint) {
-      const { getAppIdentifier, isValidAppEndpoint } = await import('./appMapping.js');
-      
-      if (isValidAppEndpoint(appEndpoint)) {
-        const appIdentifier = getAppIdentifier(appEndpoint);
-        let role = 'user';
-        if (appIdentifier === 'sera-food-business-app') {
-          role = 'business-user';
+
+    // Deserialize user from session
+    passport.deserializeUser(async (id, done) => {
+        try {
+            const user = await User.findById(id);
+            done(null, user);
+        } catch (error) {
+            done(error, null);
         }
-        newUser.appRegistered.push({
-          appIdentifier,
-          role,
-          authMethod: 'google-oauth',
-          isActive: true
-        });
-      }
-    }
-    
-    await newUser.save();
-    return done(null, newUser);
-    
-  } catch (error) {
-    console.error('Google OAuth error:', error);
-    return done(error, null);
-  }
-  }));
-} else {
-  console.log('Google OAuth not configured - missing environment variables');
-}
+    });
+};
 
-passport.serializeUser((user, done) => {
-  done(null, user.id);
-});
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
 
-passport.deserializeUser(async (id, done) => {
-  try {
-    const user = await User.findById(id);
-    done(null, user);
-  } catch (error) {
-    done(error, null);
-  }
-});
+const initializePassport = () => {
+    configureGoogleStrategy();
+    configureFacebookStrategy();
+    configureGitHubStrategy();
+    configureSerialization();
+};
+
+// Initialize Passport
+initializePassport();
+
+// ============================================================================
+// EXPORTS
+// ============================================================================
 
 export default passport;
+export { isOAuthConfigured, OAUTH_CONFIG };

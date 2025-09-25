@@ -1,205 +1,152 @@
-import User from '../models/User.js';
-import { getAppIdentifier, isValidAppEndpoint, isValidRole } from '../config/appMapping.js';
+import { getAppIdentifier } from '../config/appMapping.js';
+import {
+  validateBasicFields,
+  validateAppEndpoint,
+  processRoles,
+  validateRoles,
+  findUserByEmail,
+  createNewUser,
+  addAppToExistingUser,
+  findAppRegistration,
+  validateAppAccess,
+  validateAuthMethod,
+  validateSelectedRole,
+  authenticateUser,
+  buildUserResponse,
+  buildRegistrationResponse
+} from '../utils/authUtils.js';
+
+import {
+  sendSuccessResponse,
+  sendCreatedResponse,
+  sendValidationErrorResponse,
+  sendUnauthorizedResponse,
+  sendInternalServerErrorResponse,
+  logRequest,
+  logError
+} from '../utils/responseHelpers.js';
 
 // Test endpoint
 export const test = (req, res) => {
-  res.json({ 
-    success: true, 
-    message: 'Basic auth service is working',
+  return sendSuccessResponse(res, {
     timestamp: new Date().toISOString()
-  });
+  }, 'Basic auth service is working');
 };
 
 // Register user
 export const register = async (req, res) => {
   try {
-    console.log('Registration request:', req.body);
+    logRequest(req, 'Registration');
     
     const { username, email, password, roles, appEndpoint } = req.body;
 
     // Basic validation
-    if (!email || !password || !appEndpoint) {
-      return res.status(400).json({
-        success: false,
-        error: 'Email, password, and appEndpoint are required'
-      });
+    const basicValidation = validateBasicFields(email, password, appEndpoint);
+    if (!basicValidation.isValid) {
+      return sendValidationErrorResponse(res, basicValidation);
     }
 
     // Validate app endpoint
-    if (!isValidAppEndpoint(appEndpoint)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid app endpoint'
-      });
+    const appValidation = validateAppEndpoint(appEndpoint);
+    if (!appValidation.isValid) {
+      return sendValidationErrorResponse(res, appValidation);
     }
 
     const appIdentifier = getAppIdentifier(appEndpoint);
     
-    // Handle roles - if single role provided, convert to array
-    let userRoles = roles;
-    if (!userRoles) {
-      // Default roles based on app
-      userRoles = appIdentifier === 'sera-food-business-app' ? ['business-user'] : ['user'];
-    } else if (typeof userRoles === 'string') {
-      userRoles = [userRoles];
-    }
-    
-    // Validate all roles
-    for (const role of userRoles) {
-      if (!isValidRole(role)) {
-        return res.status(400).json({
-          success: false,
-          error: `Invalid role: ${role}`
-        });
-      }
+    // Process and validate roles
+    const userRoles = processRoles(roles, appIdentifier);
+    const roleValidation = validateRoles(userRoles);
+    if (!roleValidation.isValid) {
+      return sendValidationErrorResponse(res, roleValidation);
     }
 
     // Check if user already exists
-    let user = await User.findOne({ email: email.toLowerCase().trim() });
+    let user = await findUserByEmail(email);
 
     if (user) {
       // User exists, check if they have access to this app
       if (user.hasAccessToApp(appIdentifier)) {
-        return res.status(400).json({
-          success: false,
+        return sendValidationErrorResponse(res, {
           error: 'User already has access to this app'
         });
       }
       
-            // Add app registration to existing user with app-specific password
-            await user.addAppRegistration(appIdentifier, userRoles, 'email-password', password);
+      // Add app registration to existing user
+      user = await addAppToExistingUser(user, appIdentifier, userRoles, password);
     } else {
       // Create new user
-      user = await User.create({
-        username: username || null,
-        email: email.toLowerCase().trim(),
-        appRegistered: [{
-          appIdentifier,
-          roles: userRoles,
-          authMethod: 'email-password',
-          password: password,
-          isActive: true
-        }]
-      });
+      user = await createNewUser({ username, email }, appIdentifier, userRoles, password);
     }
 
-    res.status(201).json({
-      success: true,
-      message: 'User registered successfully',
-      data: {
-        user: {
-          id: user._id,
-          username: user.username,
-          email: user.email,
-          appRegistered: user.appRegistered
-        }
-      }
-    });
+    return sendCreatedResponse(res, {
+      user: buildRegistrationResponse(user)
+    }, 'User registered successfully');
 
   } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Registration failed',
-      details: error.message
-    });
+    logError('Registration', error);
+    return sendInternalServerErrorResponse(res, 'Registration failed', error.message);
   }
 };
 
 // Login user
 export const login = async (req, res) => {
   try {
-    console.log('Login request:', req.body);
+    logRequest(req, 'Login');
     
-        const { email, password, appEndpoint, selectedRole } = req.body;
+    const { email, password, appEndpoint, selectedRole } = req.body;
 
     // Basic validation
-    if (!email || !password || !appEndpoint) {
-      return res.status(400).json({
-        success: false,
-        error: 'Email, password, and appEndpoint are required'
-      });
+    const basicValidation = validateBasicFields(email, password, appEndpoint);
+    if (!basicValidation.isValid) {
+      return sendValidationErrorResponse(res, basicValidation);
     }
 
     // Validate app endpoint
-    if (!isValidAppEndpoint(appEndpoint)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid app endpoint'
-      });
+    const appValidation = validateAppEndpoint(appEndpoint);
+    if (!appValidation.isValid) {
+      return sendValidationErrorResponse(res, appValidation);
     }
 
     const appIdentifier = getAppIdentifier(appEndpoint);
 
     // Find user
-    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    const user = await findUserByEmail(email);
     if (!user) {
-      return res.status(401).json({
-        success: false,
-        error: 'Invalid credentials'
-      });
+      return sendUnauthorizedResponse(res, 'Invalid credentials');
     }
 
     // Check if user has access to this app and get the app registration
-    const appRegistration = user.appRegistered.find(app => app.appIdentifier === appIdentifier);
-    if (!appRegistration || !appRegistration.isActive) {
-      return res.status(403).json({
-        success: false,
-        error: 'No access to this app'
-      });
+    const appRegistration = findAppRegistration(user, appIdentifier);
+    const accessValidation = validateAppAccess(appRegistration);
+    if (!accessValidation.isValid) {
+      return sendValidationErrorResponse(res, accessValidation);
     }
 
     // Check if the authentication method matches
-    if (appRegistration.authMethod !== 'email-password') {
-      return res.status(403).json({
-        success: false,
-        error: `Must use ${appRegistration.authMethod} to access this app`
-      });
+    const authMethodValidation = validateAuthMethod(appRegistration);
+    if (!authMethodValidation.isValid) {
+      return sendValidationErrorResponse(res, authMethodValidation);
     }
 
     // Validate selected role
-    if (selectedRole && !user.hasRoleForApp(appIdentifier, selectedRole)) {
-      return res.status(403).json({
-        success: false,
-        error: `User does not have role '${selectedRole}' for this app`,
-        availableRoles: appRegistration.roles
-      });
+    const roleValidation = validateSelectedRole(user, appIdentifier, selectedRole, appRegistration);
+    if (!roleValidation.isValid) {
+      return sendValidationErrorResponse(res, roleValidation);
     }
 
     // Check app-specific password
-    const isPasswordValid = await user.comparePasswordForApp(appIdentifier, password);
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        error: 'Invalid credentials'
-      });
+    const passwordValidation = await authenticateUser(user, appIdentifier, password);
+    if (!passwordValidation.isValid) {
+      return sendUnauthorizedResponse(res, passwordValidation.error);
     }
 
-    // Determine the role to return (selected role or first available role)
-    const finalRole = selectedRole || appRegistration.roles[0];
-
-    res.json({
-      success: true,
-      message: 'Login successful',
-      data: {
-        user: {
-          id: user._id,
-          username: user.username,
-          email: user.email,
-          role: finalRole,
-          availableRoles: appRegistration.roles,
-          appIdentifier: appIdentifier,
-          authMethod: appRegistration.authMethod
-        }
-      }
-    });
+    return sendSuccessResponse(res, {
+      user: buildUserResponse(user, appRegistration, appIdentifier, selectedRole)
+    }, 'Login successful');
 
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Login failed',
-      details: error.message
-    });
+    logError('Login', error);
+    return sendInternalServerErrorResponse(res, 'Login failed', error.message);
   }
 };
