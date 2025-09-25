@@ -1,5 +1,6 @@
 import express from 'express';
 import {
+  test,
   register,
   login,
   logout,
@@ -25,6 +26,7 @@ import { protect } from '../middleware/auth.js';
 const router = express.Router();
 
 // Public routes
+router.get('/test', test); // Test endpoint
 router.post('/register', register); // Removed validation for testing
 router.post('/login', validateLogin, login);
 router.post('/refresh', validateRefreshToken, refreshToken);

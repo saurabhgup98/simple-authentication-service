@@ -6,12 +6,25 @@ import { sendEmail } from '../utils/email.js';
 import { ensureConnection } from '../config/database.js';
 import { getAppIdentifier, isValidAppEndpoint } from '../config/appMapping.js';
 
+// @desc    Test endpoint
+// @route   GET /api/auth/test
+// @access  Public
+export const test = async (req, res) => {
+  res.json({ 
+    success: true, 
+    message: 'Auth service is working',
+    timestamp: new Date().toISOString()
+  });
+};
+
 // @desc    Register user (Simplified for testing)
 // @route   POST /api/auth/register
 // @access  Public
 export const register = async (req, res) => {
   try {
+    console.log('=== REGISTRATION ENDPOINT REACHED ===');
     console.log('Registration attempt:', { name: req.body.name, email: req.body.email });
+    console.log('Full request body:', req.body);
     const { name, email, password, appEndpoint, authMethod = 'email-password' } = req.body;
 
     // Validate auth method
