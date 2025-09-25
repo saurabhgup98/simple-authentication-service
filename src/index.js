@@ -2,9 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import connectDB from './config/database.js';
-
-// Import routes
 import authRoutes from './routes/auth.js';
+import { errorHandler } from './middleware/errorHandler.js';
+import { notFound } from './middleware/notFound.js';
 
 dotenv.config();
 
@@ -14,12 +14,9 @@ const PORT = process.env.PORT || 5000;
 // Connect to database
 connectDB().catch((error) => {
   console.error('Database connection failed:', error);
-  if (process.env.VERCEL !== '1') {
-    process.exit(1);
-  }
 });
 
-// CORS configuration
+// CORS
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001', 
@@ -36,9 +33,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'x-app-endpoint'],
 }));
 
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Body parsing
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Request logging
 app.use((req, res, next) => {
@@ -48,42 +45,27 @@ app.use((req, res, next) => {
 
 // Root endpoint
 app.get('/', (req, res) => {
-  res.status(200).json({
-    message: 'Simple Authentication Service is running!',
+  res.json({
+    message: 'Basic Authentication Service',
     status: 'OK',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
+    timestamp: new Date().toISOString()
   });
 });
 
-// Health check endpoint
+// Health check
 app.get('/health', (req, res) => {
-  res.status(200).json({
+  res.json({
     status: 'OK',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
+    timestamp: new Date().toISOString()
   });
 });
 
 // Routes
 app.use('/api/auth', authRoutes);
 
-// Simple error handling
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    error: 'Route not found'
-  });
-});
-
-app.use((err, req, res, next) => {
-  console.error('Error:', err);
-  res.status(500).json({
-    success: false,
-    error: 'Internal server error',
-    details: err.message
-  });
-});
+// Error handling
+app.use(notFound);
+app.use(errorHandler);
 
 // Start server
 if (process.env.VERCEL !== '1') {

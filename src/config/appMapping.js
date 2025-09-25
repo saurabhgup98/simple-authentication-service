@@ -1,6 +1,4 @@
 // App Mapping Configuration
-// Maps app endpoints to their corresponding app identifiers
-
 export const APP_MAPPING = {
   'https://food-delivery-app-frontend.vercel.app': 'sera-food-customer-app',
   'https://food-delivery-business-app-sera.vercel.app': 'sera-food-business-app',

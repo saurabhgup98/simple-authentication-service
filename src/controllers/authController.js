@@ -1,13 +1,19 @@
 import User from '../models/User.js';
 import { getAppIdentifier, isValidAppEndpoint } from '../config/appMapping.js';
 
-// @desc    Register user
-// @route   POST /api/auth/register
-// @access  Public
+// Test endpoint
+export const test = (req, res) => {
+  res.json({ 
+    success: true, 
+    message: 'Basic auth service is working',
+    timestamp: new Date().toISOString()
+  });
+};
+
+// Register user
 export const register = async (req, res) => {
   try {
-    console.log('=== REGISTRATION REQUEST ===');
-    console.log('Request body:', req.body);
+    console.log('Registration request:', req.body);
     
     const { username, email, password, role, appEndpoint } = req.body;
 
@@ -29,18 +35,11 @@ export const register = async (req, res) => {
 
     const appIdentifier = getAppIdentifier(appEndpoint);
     
-    // Set default role if not provided
+    // Set default role
     let userRole = role || 'user';
     if (appIdentifier === 'sera-food-business-app' && !role) {
       userRole = 'business-user';
     }
-
-    console.log('Processing registration:', {
-      email,
-      appEndpoint,
-      appIdentifier,
-      role: userRole
-    });
 
     // Check if user already exists
     let user = await User.findOne({ email: email.toLowerCase().trim() });
@@ -56,7 +55,6 @@ export const register = async (req, res) => {
       
       // Add app registration to existing user
       await user.addAppRegistration(appIdentifier, userRole);
-      console.log('Added app registration to existing user');
     } else {
       // Create new user
       user = await User.create({
@@ -66,19 +64,21 @@ export const register = async (req, res) => {
         appRegistered: [{
           appIdentifier,
           role: userRole,
-          isActive: true,
-          activatedAt: new Date()
-        }],
-        emailVerified: true // Skip email verification for now
+          isActive: true
+        }]
       });
-      console.log('Created new user:', user._id);
     }
 
     res.status(201).json({
       success: true,
       message: 'User registered successfully',
       data: {
-        user: user.toPublicJSON()
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          appRegistered: user.appRegistered
+        }
       }
     });
 
@@ -92,13 +92,10 @@ export const register = async (req, res) => {
   }
 };
 
-// @desc    Login user
-// @route   POST /api/auth/login
-// @access  Public
+// Login user
 export const login = async (req, res) => {
   try {
-    console.log('=== LOGIN REQUEST ===');
-    console.log('Request body:', req.body);
+    console.log('Login request:', req.body);
     
     const { email, password, appEndpoint } = req.body;
 
@@ -153,9 +150,13 @@ export const login = async (req, res) => {
       success: true,
       message: 'Login successful',
       data: {
-        user: user.toPublicJSON(),
-        role,
-        appIdentifier
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          role,
+          appIdentifier
+        }
       }
     });
 
@@ -167,15 +168,4 @@ export const login = async (req, res) => {
       details: error.message
     });
   }
-};
-
-// @desc    Test endpoint
-// @route   GET /api/auth/test
-// @access  Public
-export const test = async (req, res) => {
-  res.json({ 
-    success: true, 
-    message: 'Simple auth service is working',
-    timestamp: new Date().toISOString()
-  });
 };

@@ -2,57 +2,35 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 const userSchema = new mongoose.Schema({
-  // Basic user fields
   username: {
     type: String,
-    trim: true,
-    maxlength: [50, 'Username cannot exceed 50 characters']
+    trim: true
   },
   email: {
     type: String,
     required: true,
     unique: true,
     lowercase: true,
-    trim: true,
-    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
+    trim: true
   },
   password: {
     type: String,
-    required: true,
-    minlength: [6, 'Password must be at least 6 characters']
+    required: true
   },
-  
-  // App-specific data
   appRegistered: [{
     appIdentifier: {
       type: String,
-      required: true,
-      enum: ['sera-food-customer-app', 'sera-food-business-app', 'todo-app']
+      required: true
     },
     role: {
       type: String,
-      required: true,
-      enum: ['user', 'business-user', 'admin', 'superadmin']
+      required: true
     },
     isActive: {
       type: Boolean,
       default: true
-    },
-    activatedAt: {
-      type: Date,
-      default: Date.now
     }
-  }],
-  
-  // Basic status fields
-  emailVerified: {
-    type: Boolean,
-    default: false
-  },
-  isActive: {
-    type: Boolean,
-    default: true
-  }
+  }]
 }, {
   timestamps: true
 });
@@ -61,13 +39,9 @@ const userSchema = new mongoose.Schema({
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
   
-  try {
-    const salt = await bcrypt.genSalt(12);
-    this.password = await bcrypt.hash(this.password, salt);
-    next();
-  } catch (error) {
-    next(error);
-  }
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+  next();
 });
 
 // Compare password method
@@ -93,41 +67,16 @@ userSchema.methods.addAppRegistration = function(appIdentifier, role) {
   if (existingApp) {
     existingApp.role = role;
     existingApp.isActive = true;
-    existingApp.activatedAt = new Date();
   } else {
     this.appRegistered.push({
       appIdentifier,
       role,
-      isActive: true,
-      activatedAt: new Date()
+      isActive: true
     });
   }
   
   return this.save();
 };
-
-// Public JSON method (remove sensitive data)
-userSchema.methods.toPublicJSON = function() {
-  return {
-    id: this._id,
-    username: this.username,
-    email: this.email,
-    emailVerified: this.emailVerified,
-    isActive: this.isActive,
-    appRegistered: this.appRegistered.map(app => ({
-      appIdentifier: app.appIdentifier,
-      role: app.role,
-      isActive: app.isActive,
-      activatedAt: app.activatedAt
-    })),
-    createdAt: this.createdAt,
-    updatedAt: this.updatedAt
-  };
-};
-
-// Indexes
-userSchema.index({ email: 1 });
-userSchema.index({ createdAt: 1 });
 
 const User = mongoose.model('User', userSchema);
 

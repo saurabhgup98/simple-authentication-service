@@ -1,44 +1,25 @@
 {
   "name": "simple-authentication",
   "version": "1.0.0",
-  "description": "Centralized authentication service for multi-app ecosystem",
+  "description": "Simple authentication service",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "jest",
-    "seed": "node src/scripts/seed.js"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["authentication", "jwt", "oauth", "nodejs", "express"],
-  "author": "Your Name",
-  "license": "MIT",
+  "keywords": ["authentication", "nodejs", "express", "mongodb"],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
     "express": "^4.18.2",
+    "mongoose": "^7.5.0",
     "bcryptjs": "^2.4.3",
-    "jsonwebtoken": "^9.0.2",
     "cors": "^2.8.5",
-    "helmet": "^7.1.0",
-    "express-rate-limit": "^7.1.5",
-    "express-validator": "^7.0.1",
-    "dotenv": "^16.3.1",
-    "mongoose": "^8.0.3",
-    "passport": "^0.7.0",
-    "passport-google-oauth20": "^2.0.0",
-    "passport-facebook": "^3.0.0",
-    "passport-github2": "^0.1.12",
-    "express-session": "^1.17.3",
-    "connect-mongo": "^5.1.0",
-    "nodemailer": "^6.9.7",
-    "crypto": "^1.0.1",
-    "uuid": "^9.0.1"
+    "dotenv": "^16.3.1"
   },
   "devDependencies": {
-    "nodemon": "^3.0.2",
-    "jest": "^29.7.0",
-    "supertest": "^6.3.3"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "nodemon": "^3.0.1"
   }
 }
