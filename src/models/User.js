@@ -23,10 +23,11 @@ const userSchema = new mongoose.Schema({
       type: String,
       required: true
     },
-    role: {
+    roles: [{
       type: String,
-      required: true
-    },
+      required: true,
+      enum: ['user', 'business-user', 'admin', 'superadmin']
+    }],
     authMethod: {
       type: String,
       required: true,
@@ -78,18 +79,32 @@ userSchema.methods.hasAccessToApp = function(appIdentifier) {
   return this.appRegistered.some(app => app.appIdentifier === appIdentifier);
 };
 
-// Get role for specific app
-userSchema.methods.getRoleForApp = function(appIdentifier) {
+// Get roles for specific app
+userSchema.methods.getRolesForApp = function(appIdentifier) {
   const app = this.appRegistered.find(app => app.appIdentifier === appIdentifier);
-  return app ? app.role : null;
+  return app ? app.roles : [];
+};
+
+// Check if user has specific role for app
+userSchema.methods.hasRoleForApp = function(appIdentifier, role) {
+  const roles = this.getRolesForApp(appIdentifier);
+  return roles.includes(role);
 };
 
 // Add app registration
-userSchema.methods.addAppRegistration = function(appIdentifier, role, authMethod = 'email-password', password = null) {
+userSchema.methods.addAppRegistration = function(appIdentifier, roles, authMethod = 'email-password', password = null) {
   const existingApp = this.appRegistered.find(app => app.appIdentifier === appIdentifier);
   
+  // Ensure roles is an array
+  const rolesArray = Array.isArray(roles) ? roles : [roles];
+  
   if (existingApp) {
-    existingApp.role = role;
+    // Add new roles to existing app registration
+    rolesArray.forEach(role => {
+      if (!existingApp.roles.includes(role)) {
+        existingApp.roles.push(role);
+      }
+    });
     existingApp.authMethod = authMethod;
     existingApp.isActive = true;
     if (password && authMethod === 'email-password') {
@@ -98,7 +113,7 @@ userSchema.methods.addAppRegistration = function(appIdentifier, role, authMethod
   } else {
     const newApp = {
       appIdentifier,
-      role,
+      roles: rolesArray,
       authMethod,
       isActive: true
     };

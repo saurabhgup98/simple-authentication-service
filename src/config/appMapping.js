@@ -19,3 +19,9 @@ export const isValidAppEndpoint = (appEndpoint) => {
 export const getSupportedApps = () => {
   return Object.keys(APP_MAPPING);
 };
+
+// Simple role validation - just check if role is valid
+export const isValidRole = (role) => {
+  const validRoles = ['user', 'business-user', 'admin', 'superadmin'];
+  return validRoles.includes(role);
+};

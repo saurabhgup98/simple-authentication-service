@@ -1,5 +1,5 @@
 import User from '../models/User.js';
-import { getAppIdentifier, isValidAppEndpoint } from '../config/appMapping.js';
+import { getAppIdentifier, isValidAppEndpoint, isValidRole } from '../config/appMapping.js';
 
 // Test endpoint
 export const test = (req, res) => {
@@ -15,7 +15,7 @@ export const register = async (req, res) => {
   try {
     console.log('Registration request:', req.body);
     
-    const { username, email, password, role, appEndpoint } = req.body;
+    const { username, email, password, roles, appEndpoint } = req.body;
 
     // Basic validation
     if (!email || !password || !appEndpoint) {
@@ -35,10 +35,23 @@ export const register = async (req, res) => {
 
     const appIdentifier = getAppIdentifier(appEndpoint);
     
-    // Set default role
-    let userRole = role || 'user';
-    if (appIdentifier === 'sera-food-business-app' && !role) {
-      userRole = 'business-user';
+    // Handle roles - if single role provided, convert to array
+    let userRoles = roles;
+    if (!userRoles) {
+      // Default roles based on app
+      userRoles = appIdentifier === 'sera-food-business-app' ? ['business-user'] : ['user'];
+    } else if (typeof userRoles === 'string') {
+      userRoles = [userRoles];
+    }
+    
+    // Validate all roles
+    for (const role of userRoles) {
+      if (!isValidRole(role)) {
+        return res.status(400).json({
+          success: false,
+          error: `Invalid role: ${role}`
+        });
+      }
     }
 
     // Check if user already exists
@@ -54,7 +67,7 @@ export const register = async (req, res) => {
       }
       
             // Add app registration to existing user with app-specific password
-            await user.addAppRegistration(appIdentifier, userRole, 'email-password', password);
+            await user.addAppRegistration(appIdentifier, userRoles, 'email-password', password);
     } else {
       // Create new user
       user = await User.create({
@@ -62,7 +75,7 @@ export const register = async (req, res) => {
         email: email.toLowerCase().trim(),
         appRegistered: [{
           appIdentifier,
-          role: userRole,
+          roles: userRoles,
           authMethod: 'email-password',
           password: password,
           isActive: true
@@ -98,7 +111,7 @@ export const login = async (req, res) => {
   try {
     console.log('Login request:', req.body);
     
-    const { email, password, appEndpoint } = req.body;
+        const { email, password, appEndpoint, selectedRole } = req.body;
 
     // Basic validation
     if (!email || !password || !appEndpoint) {
@@ -127,11 +140,29 @@ export const login = async (req, res) => {
       });
     }
 
-    // Check if user has access to this app
-    if (!user.hasAccessToApp(appIdentifier)) {
+    // Check if user has access to this app and get the app registration
+    const appRegistration = user.appRegistered.find(app => app.appIdentifier === appIdentifier);
+    if (!appRegistration || !appRegistration.isActive) {
       return res.status(403).json({
         success: false,
         error: 'No access to this app'
+      });
+    }
+
+    // Check if the authentication method matches
+    if (appRegistration.authMethod !== 'email-password') {
+      return res.status(403).json({
+        success: false,
+        error: `Must use ${appRegistration.authMethod} to access this app`
+      });
+    }
+
+    // Validate selected role
+    if (selectedRole && !user.hasRoleForApp(appIdentifier, selectedRole)) {
+      return res.status(403).json({
+        success: false,
+        error: `User does not have role '${selectedRole}' for this app`,
+        availableRoles: appRegistration.roles
       });
     }
 
@@ -144,8 +175,8 @@ export const login = async (req, res) => {
       });
     }
 
-    // Get user role for this app
-    const role = user.getRoleForApp(appIdentifier);
+    // Determine the role to return (selected role or first available role)
+    const finalRole = selectedRole || appRegistration.roles[0];
 
     res.json({
       success: true,
@@ -155,8 +186,10 @@ export const login = async (req, res) => {
           id: user._id,
           username: user.username,
           email: user.email,
-          role,
-          appIdentifier
+          role: finalRole,
+          availableRoles: appRegistration.roles,
+          appIdentifier: appIdentifier,
+          authMethod: appRegistration.authMethod
         }
       }
     });
