@@ -91,6 +91,7 @@ export const register = async (req, res) => {
     const user = await User.create({
       name: name.trim(),
       email: email.toLowerCase().trim(),
+      oauthProvider: 'local', // Set default OAuth provider
       appRegistered: [{ 
         appIdentifier, 
         role,

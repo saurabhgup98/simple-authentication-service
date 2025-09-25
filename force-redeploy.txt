@@ -1,6 +1,0 @@
-Force redeploy - Database connection fix
-Timestamp: 2025-09-11 14:57:00
-Reason: Database connection issues causing 500 errors on auth endpoints
-Changes: Triggering redeploy to refresh MongoDB connection
-Status: Testing database connectivity after redeploy
-

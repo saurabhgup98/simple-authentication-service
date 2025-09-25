@@ -164,7 +164,7 @@ userSchema.pre('save', async function(next) {
   try {
     // Hash passwords for app registrations that use email-password auth method
     for (let app of this.appRegistered) {
-      if (app.authMethod === 'email-password' && app.password && app.isModified('password')) {
+      if (app.authMethod === 'email-password' && app.password && typeof app.password === 'string' && !app.password.startsWith('$2a$')) {
         const salt = await bcrypt.genSalt(parseInt(process.env.BCRYPT_SALT_ROUNDS) || 12);
         app.password = await bcrypt.hash(app.password, salt);
       }
