@@ -1,41 +1,11 @@
 import express from 'express';
-import {
-  test,
-  register,
-  login,
-  logout,
-  refreshToken,
-  forgotPassword,
-  resetPassword,
-  verifyEmail,
-  resendVerification
-} from '../controllers/authController.js';
-
-import {
-  validateRegistration,
-  validateLogin,
-  validatePasswordChange,
-  validateForgotPassword,
-  validateResetPassword,
-  validateEmailVerification,
-  validateRefreshToken
-} from '../middleware/validation.js';
-
-import { protect } from '../middleware/auth.js';
+import { test, register, login } from '../controllers/authController.js';
 
 const router = express.Router();
 
 // Public routes
-router.get('/test', test); // Test endpoint
-router.post('/register', register); // Removed validation for testing
-router.post('/login', validateLogin, login);
-router.post('/refresh', validateRefreshToken, refreshToken);
-router.post('/forgot-password', validateForgotPassword, forgotPassword);
-router.post('/reset-password', validateResetPassword, resetPassword);
-router.post('/verify-email', validateEmailVerification, verifyEmail);
-router.post('/resend-verification', protect, resendVerification);
-
-// Protected routes
-router.post('/logout', protect, logout);
+router.get('/test', test);
+router.post('/register', register);
+router.post('/login', login);
 
 export default router;
