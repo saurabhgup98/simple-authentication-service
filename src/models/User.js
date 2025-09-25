@@ -13,12 +13,6 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     trim: true
   },
-  password: {
-    type: String,
-    required: function() {
-      return !this.googleId; // Password not required if OAuth user
-    }
-  },
   googleId: {
     type: String,
     sparse: true,
@@ -39,6 +33,12 @@ const userSchema = new mongoose.Schema({
       enum: ['email-password', 'google-oauth'],
       default: 'email-password'
     },
+    password: {
+      type: String,
+      required: function() {
+        return this.authMethod === 'email-password';
+      }
+    },
     isActive: {
       type: Boolean,
       default: true
@@ -48,18 +48,29 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Hash password before saving
+// Hash app-specific passwords before saving
 userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-  next();
+  try {
+    // Hash passwords for app registrations that use email-password auth method
+    for (let app of this.appRegistered) {
+      if (app.authMethod === 'email-password' && app.password && typeof app.password === 'string' && !app.password.startsWith('$2a$')) {
+        const salt = await bcrypt.genSalt(10);
+        app.password = await bcrypt.hash(app.password, salt);
+      }
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
 
-// Compare password method
-userSchema.methods.comparePassword = async function(candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.password);
+// Compare password for specific app
+userSchema.methods.comparePasswordForApp = async function(appIdentifier, candidatePassword) {
+  const app = this.appRegistered.find(app => app.appIdentifier === appIdentifier);
+  if (!app || app.authMethod !== 'email-password' || !app.password) {
+    return false;
+  }
+  return await bcrypt.compare(candidatePassword, app.password);
 };
 
 // Check if user has access to app
@@ -74,20 +85,29 @@ userSchema.methods.getRoleForApp = function(appIdentifier) {
 };
 
 // Add app registration
-userSchema.methods.addAppRegistration = function(appIdentifier, role, authMethod = 'email-password') {
+userSchema.methods.addAppRegistration = function(appIdentifier, role, authMethod = 'email-password', password = null) {
   const existingApp = this.appRegistered.find(app => app.appIdentifier === appIdentifier);
   
   if (existingApp) {
     existingApp.role = role;
     existingApp.authMethod = authMethod;
     existingApp.isActive = true;
+    if (password && authMethod === 'email-password') {
+      existingApp.password = password;
+    }
   } else {
-    this.appRegistered.push({
+    const newApp = {
       appIdentifier,
       role,
       authMethod,
       isActive: true
-    });
+    };
+    
+    if (password && authMethod === 'email-password') {
+      newApp.password = password;
+    }
+    
+    this.appRegistered.push(newApp);
   }
   
   return this.save();

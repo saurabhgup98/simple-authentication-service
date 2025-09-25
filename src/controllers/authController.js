@@ -53,18 +53,18 @@ export const register = async (req, res) => {
         });
       }
       
-      // Add app registration to existing user
-      await user.addAppRegistration(appIdentifier, userRole, 'email-password');
+            // Add app registration to existing user with app-specific password
+            await user.addAppRegistration(appIdentifier, userRole, 'email-password', password);
     } else {
       // Create new user
       user = await User.create({
         username: username || null,
         email: email.toLowerCase().trim(),
-        password,
         appRegistered: [{
           appIdentifier,
           role: userRole,
           authMethod: 'email-password',
+          password: password,
           isActive: true
         }]
       });
@@ -135,8 +135,8 @@ export const login = async (req, res) => {
       });
     }
 
-    // Check password
-    const isPasswordValid = await user.comparePassword(password);
+    // Check app-specific password
+    const isPasswordValid = await user.comparePasswordForApp(appIdentifier, password);
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
