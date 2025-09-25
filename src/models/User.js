@@ -37,9 +37,7 @@ const userSchema = new mongoose.Schema({
     },
     password: {
       type: String,
-      required: function() {
-        return this.authMethod === 'email-password';
-      }
+      required: false
     },
     isActive: {
       type: Boolean,

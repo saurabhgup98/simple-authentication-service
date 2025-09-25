@@ -88,6 +88,21 @@ export const register = async (req, res) => {
     }
 
     // Create new user with app-specific authentication
+    console.log('Creating user with data:', {
+      name: name.trim(),
+      email: email.toLowerCase().trim(),
+      oauthProvider: 'local',
+      appRegistered: [{ 
+        appIdentifier, 
+        role,
+        authMethod,
+        password: authMethod === 'email-password' ? '[HIDDEN]' : null,
+        isActive: true,
+        activatedAt: new Date()
+      }],
+      emailVerified: true
+    });
+
     const user = await User.create({
       name: name.trim(),
       email: email.toLowerCase().trim(),
@@ -132,8 +147,30 @@ export const register = async (req, res) => {
     console.error('Error details:', {
       message: error.message,
       stack: error.stack,
-      name: error.name
+      name: error.name,
+      code: error.code,
+      keyValue: error.keyValue,
+      errors: error.errors
     });
+    
+    // Handle specific Mongoose errors
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(err => err.message).join(', ');
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: validationErrors
+      });
+    }
+    
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyValue)[0];
+      return res.status(400).json({
+        success: false,
+        error: `${field} already exists`
+      });
+    }
+    
     res.status(500).json({
       success: false,
       error: 'Registration failed',
