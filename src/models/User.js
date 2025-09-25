@@ -26,20 +26,38 @@ const userSchema = new mongoose.Schema({
     maxlength: [100, 'Name cannot exceed 100 characters']
   },
   
-  // App Registration
+  // App Registration with identifiers and per-app status
   appRegistered: [{
-    name: {
+    appIdentifier: {
       type: String,
       required: true,
-      enum: [
-        'https://food-delivery-app-frontend.vercel.app',
-        'https://food-delivery-business-app-sera.vercel.app'
-      ]
+      enum: ['sera-food-customer-app', 'sera-food-business-app', 'todo-app']
     },
     role: {
       type: String,
       required: true,
       enum: ['user', 'business-user', 'admin', 'superadmin']
+    },
+    isActive: {
+      type: Boolean,
+      default: true
+    },
+    activatedAt: {
+      type: Date,
+      default: Date.now
+    },
+    deactivatedAt: {
+      type: Date,
+      default: null
+    },
+    deactivatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    deactivationReason: {
+      type: String,
+      default: null
     }
   }],
   
@@ -207,28 +225,70 @@ userSchema.statics.findByEmailOrOAuthId = function(email, oauthId, provider) {
 };
 
 // Method to add app registration
-userSchema.methods.addAppRegistration = function(appName, role) {
+userSchema.methods.addAppRegistration = function(appIdentifier, role) {
   // Check if app already exists
-  const existingApp = this.appRegistered.find(app => app.name === appName);
+  const existingApp = this.appRegistered.find(app => app.appIdentifier === appIdentifier);
   if (existingApp) {
     // Update existing app role
     existingApp.role = role;
+    existingApp.isActive = true;
+    existingApp.activatedAt = new Date();
+    existingApp.deactivatedAt = null;
+    existingApp.deactivatedBy = null;
+    existingApp.deactivationReason = null;
   } else {
     // Add new app registration
-    this.appRegistered.push({ name: appName, role });
+    this.appRegistered.push({ 
+      appIdentifier, 
+      role,
+      isActive: true,
+      activatedAt: new Date()
+    });
   }
   return this.save();
 };
 
 // Method to get role for specific app
-userSchema.methods.getRoleForApp = function(appName) {
-  const app = this.appRegistered.find(app => app.name === appName);
+userSchema.methods.getRoleForApp = function(appIdentifier) {
+  const app = this.appRegistered.find(app => app.appIdentifier === appIdentifier);
   return app ? app.role : null;
 };
 
 // Method to check if user has access to app
-userSchema.methods.hasAccessToApp = function(appName) {
-  return this.appRegistered.some(app => app.name === appName);
+userSchema.methods.hasAccessToApp = function(appIdentifier) {
+  return this.appRegistered.some(app => app.appIdentifier === appIdentifier);
+};
+
+// Method to check if user has active access to app
+userSchema.methods.hasActiveAccessToApp = function(appIdentifier) {
+  return this.appRegistered.some(app => 
+    app.appIdentifier === appIdentifier && app.isActive
+  );
+};
+
+// Method to deactivate user from specific app
+userSchema.methods.deactivateFromApp = function(appIdentifier, deactivatedBy, reason) {
+  const app = this.appRegistered.find(app => app.appIdentifier === appIdentifier);
+  if (app) {
+    app.isActive = false;
+    app.deactivatedAt = new Date();
+    app.deactivatedBy = deactivatedBy;
+    app.deactivationReason = reason;
+  }
+  return this.save();
+};
+
+// Method to reactivate user in specific app
+userSchema.methods.reactivateInApp = function(appIdentifier) {
+  const app = this.appRegistered.find(app => app.appIdentifier === appIdentifier);
+  if (app) {
+    app.isActive = true;
+    app.activatedAt = new Date();
+    app.deactivatedAt = null;
+    app.deactivatedBy = null;
+    app.deactivationReason = null;
+  }
+  return this.save();
 };
 
 // Method to get public profile (without sensitive data)

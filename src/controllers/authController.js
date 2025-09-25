@@ -4,6 +4,7 @@ import { generateTokenPair, revokeRefreshToken, revokeAllRefreshTokens } from '.
 import { generateEmailVerificationToken, generatePasswordResetToken } from '../utils/jwt.js';
 import { sendEmail } from '../utils/email.js';
 import { ensureConnection } from '../config/database.js';
+import { getAppIdentifier, isValidAppEndpoint } from '../config/appMapping.js';
 
 // @desc    Register user (Simplified for testing)
 // @route   POST /api/auth/register
@@ -36,7 +37,8 @@ export const register = async (req, res) => {
     }
 
     // Set default values for testing
-    const appName = 'https://food-delivery-app-frontend.vercel.app';
+    const appEndpoint = 'https://food-delivery-app-frontend.vercel.app';
+    const appIdentifier = getAppIdentifier(appEndpoint);
     const role = 'user';
 
     // Ensure database connection
@@ -46,8 +48,8 @@ export const register = async (req, res) => {
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
       // If user exists, add new app registration
-      if (!existingUser.hasAccessToApp(appName)) {
-        await existingUser.addAppRegistration(appName, role);
+      if (!existingUser.hasAccessToApp(appIdentifier)) {
+        await existingUser.addAppRegistration(appIdentifier, role);
         
         // Generate tokens for existing user
         const { accessToken, refreshToken } = await generateTokenPair(existingUser._id);
@@ -73,8 +75,13 @@ export const register = async (req, res) => {
       name: name.trim(),
       email: email.toLowerCase().trim(),
       password,
-      appRegistered: [{ name: appName, role }],
-      isEmailVerified: true // Skip email verification for testing
+      appRegistered: [{ 
+        appIdentifier, 
+        role,
+        isActive: true,
+        activatedAt: new Date()
+      }],
+      emailVerified: true // Skip email verification for testing
     });
 
     // Generate tokens
@@ -119,17 +126,15 @@ export const login = async (req, res) => {
     const { email, password, appEndpoint } = req.body;
 
     // Validate appEndpoint
-    const validApps = [
-      'https://food-delivery-app-frontend.vercel.app',
-      'https://food-delivery-business-app-sera.vercel.app'
-    ];
-
-    if (!appEndpoint || !validApps.includes(appEndpoint)) {
+    if (!appEndpoint || !isValidAppEndpoint(appEndpoint)) {
       return res.status(400).json({
         success: false,
         error: 'Invalid app endpoint. Must be a valid app URL.'
       });
     }
+
+    // Get app identifier
+    const appIdentifier = getAppIdentifier(appEndpoint);
 
     // Find user by email
     const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
@@ -141,10 +146,18 @@ export const login = async (req, res) => {
     }
 
     // Check if user has access to the requested app
-    if (!user.hasAccessToApp(appEndpoint)) {
+    if (!user.hasAccessToApp(appIdentifier)) {
       return res.status(403).json({
         success: false,
         error: 'Access denied. You do not have permission to access this app.'
+      });
+    }
+
+    // Check if user has active access to the requested app
+    if (!user.hasActiveAccessToApp(appIdentifier)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access to this application has been deactivated.'
       });
     }
 
@@ -180,7 +193,7 @@ export const login = async (req, res) => {
     await user.resetLoginAttempts();
 
     // Get role for the specific app
-    const role = user.getRoleForApp(appEndpoint);
+    const role = user.getRoleForApp(appIdentifier);
 
     // Generate tokens
     const { accessToken, refreshToken } = await generateTokenPair(user._id);
@@ -196,7 +209,8 @@ export const login = async (req, res) => {
           emailVerified: user.emailVerified,
           oauthProvider: user.oauthProvider,
           role: role,
-          appEndpoint: appEndpoint
+          appEndpoint: appEndpoint,
+          appIdentifier: appIdentifier
         },
         tokens: {
           accessToken,
