@@ -56,6 +56,12 @@ export const register = async (req, res) => {
 
     const appIdentifier = getAppIdentifier(appEndpoint);
     const role = 'user'; // Default role for new registrations
+    
+    console.log('App validation:', {
+      appEndpoint,
+      appIdentifier,
+      isValid: isValidAppEndpoint(appEndpoint)
+    });
 
     // Ensure database connection
     await ensureConnection();
@@ -103,20 +109,27 @@ export const register = async (req, res) => {
       emailVerified: true
     });
 
-    const user = await User.create({
-      name: name.trim(),
-      email: email.toLowerCase().trim(),
-      oauthProvider: 'local', // Set default OAuth provider
-      appRegistered: [{ 
-        appIdentifier, 
-        role,
-        authMethod,
-        password: authMethod === 'email-password' ? password : null,
-        isActive: true,
-        activatedAt: new Date()
-      }],
-      emailVerified: true // Skip email verification for testing
-    });
+    let user;
+    try {
+      user = await User.create({
+        name: name.trim(),
+        email: email.toLowerCase().trim(),
+        oauthProvider: 'local', // Set default OAuth provider
+        appRegistered: [{ 
+          appIdentifier, 
+          role,
+          authMethod,
+          password: authMethod === 'email-password' ? password : null,
+          isActive: true,
+          activatedAt: new Date()
+        }],
+        emailVerified: true // Skip email verification for testing
+      });
+      console.log('User created successfully:', user._id);
+    } catch (createError) {
+      console.error('User creation failed:', createError);
+      throw createError;
+    }
 
     // Generate tokens
     const { accessToken, refreshToken } = await generateTokenPair(user._id);
