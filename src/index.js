@@ -10,6 +10,7 @@ import passport from './config/passport.js';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/user.js';
 import oauthRoutes from './routes/oauth.js';
+import adminRoutes from './routes/admin.js';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler.js';
@@ -151,6 +152,7 @@ app.get('/cors-test', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/oauth', oauthRoutes);
+app.use('/api/admin', adminRoutes);
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
@@ -181,6 +183,15 @@ app.get('/api', (req, res) => {
         'GET /api/oauth/facebook/callback': 'Facebook OAuth callback',
         'GET /api/oauth/github': 'GitHub OAuth login',
         'GET /api/oauth/github/callback': 'GitHub OAuth callback'
+      },
+      admin: {
+        'GET /api/admin/users': 'Get all users (Admin only)',
+        'GET /api/admin/users/:userId': 'Get user by ID (Admin only)',
+        'POST /api/admin/users/:userId/apps': 'Add app access to user (Admin only)',
+        'PUT /api/admin/users/:userId/apps/:appIdentifier': 'Update user app role (Admin only)',
+        'DELETE /api/admin/users/:userId/apps/:appIdentifier': 'Deactivate user from app (Admin only)',
+        'POST /api/admin/users/:userId/apps/:appIdentifier/reactivate': 'Reactivate user in app (Admin only)',
+        'GET /api/admin/apps/:appIdentifier/users': 'Get users by app (Admin only)'
       }
     },
     documentation: 'Use Postman to test these endpoints'

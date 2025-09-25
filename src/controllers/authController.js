@@ -12,7 +12,16 @@ import { getAppIdentifier, isValidAppEndpoint } from '../config/appMapping.js';
 export const register = async (req, res) => {
   try {
     console.log('Registration attempt:', { name: req.body.name, email: req.body.email });
-    const { name, email, password } = req.body;
+    const { name, email, password, appEndpoint, authMethod = 'email-password' } = req.body;
+
+    // Validate auth method
+    const validAuthMethods = ['email-password', 'google-oauth', 'facebook-oauth', 'github-oauth'];
+    if (!validAuthMethods.includes(authMethod)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid authentication method'
+      });
+    }
 
     // Minimal validation - just check if fields are not empty
     if (!name || name.trim() === '') {
@@ -29,17 +38,24 @@ export const register = async (req, res) => {
       });
     }
 
-    if (!password || password.trim() === '') {
+    // Validate password only for email-password auth method
+    if (authMethod === 'email-password' && (!password || password.trim() === '')) {
       return res.status(400).json({
         success: false,
-        error: 'Password is required and cannot be empty'
+        error: 'Password is required for email-password authentication'
       });
     }
 
-    // Set default values for testing
-    const appEndpoint = 'https://food-delivery-app-frontend.vercel.app';
+    // Validate app endpoint
+    if (!appEndpoint || !isValidAppEndpoint(appEndpoint)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid app endpoint. Must be a valid app URL.'
+      });
+    }
+
     const appIdentifier = getAppIdentifier(appEndpoint);
-    const role = 'user';
+    const role = 'user'; // Default role for new registrations
 
     // Ensure database connection
     await ensureConnection();
@@ -47,37 +63,39 @@ export const register = async (req, res) => {
     // Check if user already exists
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
-      // If user exists, add new app registration
-      if (!existingUser.hasAccessToApp(appIdentifier)) {
-        await existingUser.addAppRegistration(appIdentifier, role);
-        
-        // Generate tokens for existing user
-        const { accessToken, refreshToken } = await generateTokenPair(existingUser._id);
-        
-        return res.status(200).json({
-          success: true,
-          message: 'App access added to existing account',
-          data: {
-            user: existingUser.toPublicJSON(),
-            tokens: { accessToken, refreshToken }
-          }
-        });
-      } else {
+      // Check if user already has access to this app
+      if (existingUser.hasAccessToApp(appIdentifier)) {
         return res.status(400).json({
           success: false,
-          error: 'User already has access to this app'
+          error: 'User already has access to this app. Please use your existing authentication method to login.'
         });
       }
+      
+      // Add new app registration to existing user
+      await existingUser.addAppRegistration(appIdentifier, role, authMethod, password);
+      
+      // Generate tokens for existing user
+      const { accessToken, refreshToken } = await generateTokenPair(existingUser._id);
+      
+      return res.status(200).json({
+        success: true,
+        message: 'App access added to existing account',
+        data: {
+          user: existingUser.toPublicJSON(),
+          tokens: { accessToken, refreshToken }
+        }
+      });
     }
 
-    // Create new user (simplified - no email verification)
+    // Create new user with app-specific authentication
     const user = await User.create({
       name: name.trim(),
       email: email.toLowerCase().trim(),
-      password,
       appRegistered: [{ 
         appIdentifier, 
         role,
+        authMethod,
+        password: authMethod === 'email-password' ? password : null,
         isActive: true,
         activatedAt: new Date()
       }],
@@ -95,7 +113,12 @@ export const register = async (req, res) => {
           id: user._id,
           name: user.name,
           email: user.email,
-          emailVerified: user.emailVerified
+          emailVerified: user.emailVerified,
+          oauthProvider: user.oauthProvider,
+          role: role,
+          appEndpoint: appEndpoint,
+          appIdentifier: appIdentifier,
+          authMethod: authMethod
         },
         tokens: {
           accessToken,
@@ -137,7 +160,7 @@ export const login = async (req, res) => {
     const appIdentifier = getAppIdentifier(appEndpoint);
 
     // Find user by email
-    const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+    const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -161,11 +184,28 @@ export const login = async (req, res) => {
       });
     }
 
-    // Check if account is locked
-    if (user.isAccountLocked()) {
+    // Validate authentication method for this app
+    const authValidation = user.validateAuthMethodForApp(appIdentifier, 'email-password');
+    if (!authValidation.success) {
+      return res.status(403).json({
+        success: false,
+        error: authValidation.error
+      });
+    }
+
+    // Check if global account is locked
+    if (user.isGlobalAccountLocked()) {
       return res.status(401).json({
         success: false,
         error: 'Account is temporarily locked due to too many failed login attempts'
+      });
+    }
+
+    // Check if app-specific account is locked
+    if (user.isAppAccountLocked(appIdentifier)) {
+      return res.status(401).json({
+        success: false,
+        error: 'App access is temporarily locked due to too many failed login attempts'
       });
     }
 
@@ -177,11 +217,11 @@ export const login = async (req, res) => {
       });
     }
 
-    // Verify password
-    const isPasswordValid = await user.comparePassword(password);
+    // Verify password for specific app
+    const isPasswordValid = await user.comparePasswordForApp(appIdentifier, password);
     if (!isPasswordValid) {
-      // Increment login attempts
-      await user.incrementLoginAttempts();
+      // Increment app-specific login attempts
+      await user.incrementAppLoginAttempts(appIdentifier);
       
       return res.status(401).json({
         success: false,
@@ -190,10 +230,11 @@ export const login = async (req, res) => {
     }
 
     // Reset login attempts on successful login
-    await user.resetLoginAttempts();
+    await user.resetAppLoginAttempts(appIdentifier);
 
     // Get role for the specific app
     const role = user.getRoleForApp(appIdentifier);
+    const authMethod = user.getAuthMethodForApp(appIdentifier);
 
     // Generate tokens
     const { accessToken, refreshToken } = await generateTokenPair(user._id);
@@ -210,7 +251,8 @@ export const login = async (req, res) => {
           oauthProvider: user.oauthProvider,
           role: role,
           appEndpoint: appEndpoint,
-          appIdentifier: appIdentifier
+          appIdentifier: appIdentifier,
+          authMethod: authMethod
         },
         tokens: {
           accessToken,
