@@ -1,6 +1,6 @@
 // App Mapping Configuration
 export const APP_MAPPING = {
-  'https://food-delivery-app-frontend.vercel.app': 'sera-food-customer-app',
+  'https://food-delivery-sera.vercel.app': 'sera-food-customer-app',
   'https://food-delivery-business-app-sera.vercel.app': 'sera-food-business-app',
   'https://todo-frontend-beta-three-78.vercel.app': 'todo-app'
 };

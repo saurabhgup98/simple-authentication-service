@@ -24,7 +24,7 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001', 
   'http://localhost:3002',
-  'https://food-delivery-app-frontend.vercel.app',
+  'https://food-delivery-sera.vercel.app',
   'https://food-delivery-business-app-sera.vercel.app',
   'https://todo-frontend-beta-three-78.vercel.app'
 ];
