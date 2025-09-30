@@ -1,8 +1,24 @@
 // App Mapping Configuration
 export const APP_MAPPING = {
+  // Production URLs (Vercel deployments)
   'https://food-delivery-sera.vercel.app': 'sera-food-customer-app',
   'https://food-delivery-business-app-sera.vercel.app': 'sera-food-business-app',
-  'https://todo-frontend-beta-three-78.vercel.app': 'todo-app'
+  'https://todo-frontend-beta-three-78.vercel.app': 'todo-app',
+  
+  // Local development URLs
+  'http://localhost:3000': 'todo-app',                    // Todo App
+  'http://localhost:3001': 'sera-food-customer-app',     // Customer App
+  'http://localhost:3002': 'sera-food-business-app',     // Business App
+  
+  // Network development URLs (for mobile testing)
+  'http://192.168.1.4:3000': 'todo-app',                 // Todo App
+  'http://192.168.1.4:3001': 'sera-food-customer-app',  // Customer App
+  'http://192.168.1.4:3002': 'sera-food-business-app',  // Business App
+  
+  // Alternative localhost formats
+  'http://127.0.0.1:3000': 'todo-app',
+  'http://127.0.0.1:3001': 'sera-food-customer-app',
+  'http://127.0.0.1:3002': 'sera-food-business-app'
 };
 
 // Get app identifier from endpoint
