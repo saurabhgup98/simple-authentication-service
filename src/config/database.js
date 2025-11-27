@@ -13,7 +13,6 @@ const DB_CONFIG = {
     maxPoolSize: 10,
     heartbeatFrequencyMS: 10000,
     bufferCommands: false, // Disable mongoose buffering; throw an error if not connected
-    bufferMaxEntries: 0, // Disable mongoose buffering
 };
 
 const CONNECTION_STATES = {
