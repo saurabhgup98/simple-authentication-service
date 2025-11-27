@@ -73,6 +73,10 @@ const configureSerialization = () => {
     // Deserialize user from session
     passport.deserializeUser(async (id, done) => {
         try {
+            // Ensure database connection before querying
+            const { ensureConnection } = await import('./database.js');
+            await ensureConnection();
+            
             const user = await User.findById(id);
             done(null, user);
         } catch (error) {

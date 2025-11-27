@@ -8,10 +8,12 @@ dotenv.config();
 // ============================================================================
 
 const DB_CONFIG = {
-    serverSelectionTimeoutMS: 30000,
+    serverSelectionTimeoutMS: 10000, // Reduced from 30000 to fail faster
     socketTimeoutMS: 45000,
     maxPoolSize: 10,
     heartbeatFrequencyMS: 10000,
+    bufferCommands: false, // Disable mongoose buffering; throw an error if not connected
+    bufferMaxEntries: 0, // Disable mongoose buffering
 };
 
 const CONNECTION_STATES = {
@@ -80,11 +82,28 @@ const setupConnectionEvents = () => {
 };
 
 // ============================================================================
+// CONNECTION CACHING (for serverless environments)
+// ============================================================================
+
+// Cache connection for serverless environments
+let cached = global.mongoose;
+
+if (!cached) {
+    cached = global.mongoose = { conn: null, promise: null };
+}
+
+// ============================================================================
 // MAIN CONNECTION FUNCTIONS
 // ============================================================================
 
 const connectDB = async () => {
     try {
+        // Return cached connection if available
+        if (cached.conn) {
+            console.log('Using cached MongoDB connection');
+            return cached.conn;
+        }
+
         // Validate environment
         if (!getMongoUri()) {
             console.error('MONGODB_URI environment variable is not set');
@@ -94,31 +113,65 @@ const connectDB = async () => {
             return;
         }
 
-        // Connect to MongoDB
-        const conn = await mongoose.connect(getMongoUri(), DB_CONFIG);
-        console.log(`MongoDB Connected: ${conn.connection.host}`);
+        // Use existing promise if connection is in progress
+        if (!cached.promise) {
+            console.log('Creating new MongoDB connection...');
+            cached.promise = mongoose.connect(getMongoUri(), DB_CONFIG).then((conn) => {
+                console.log(`MongoDB Connected: ${conn.connection.host}`);
+                setupConnectionEvents();
+                return conn;
+            }).catch((error) => {
+                // Clear promise on error so we can retry
+                cached.promise = null;
+                throw error;
+            });
+        }
 
-        // Setup event handlers
-        setupConnectionEvents();
-
-        return conn;
+        // Wait for connection
+        cached.conn = await cached.promise;
+        return cached.conn;
     } catch (error) {
         console.error('Database connection failed:', error);
+        cached.promise = null;
+        cached.conn = null;
 
         if (!isVercelEnvironment()) {
             process.exit(1);
         }
 
-        console.log('Continuing without database connection in serverless environment');
         throw error;
     }
 };
 
 const ensureConnection = async () => {
-    if (!isConnected()) {
-        console.log('Database not connected, attempting to connect...');
+    // Check if already connected
+    if (isConnected()) {
+        return;
+    }
+
+    // Check if connection is in progress
+    if (cached.promise) {
+        console.log('Waiting for existing connection...');
+        try {
+            await cached.promise;
+            return;
+        } catch (error) {
+            // Connection failed, will try to reconnect
+            console.log('Previous connection failed, attempting new connection...');
+        }
+    }
+
+    // Attempt to connect
+    console.log('Database not connected, attempting to connect...');
+    try {
         await connectDB();
-        await waitForConnection();
+        // Wait a bit to ensure connection is fully established
+        if (!isConnected()) {
+            await waitForConnection();
+        }
+    } catch (error) {
+        console.error('Failed to ensure connection:', error);
+        throw error;
     }
 };
 

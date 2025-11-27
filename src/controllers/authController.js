@@ -1,4 +1,5 @@
 import { getAppIdentifier } from '../config/appMapping.js';
+import { ensureConnection } from '../config/database.js';
 import {
   validateBasicFields,
   validateAppEndpoint,
@@ -37,6 +38,9 @@ export const test = (req, res) => {
 export const register = async (req, res) => {
   try {
     logRequest(req, 'Registration');
+    
+    // Ensure database connection before proceeding
+    await ensureConnection();
     
     const { username, email, password, roles, appEndpoint } = req.body;
 
@@ -93,6 +97,9 @@ export const register = async (req, res) => {
 export const login = async (req, res) => {
   try {
     logRequest(req, 'Login');
+    
+    // Ensure database connection before proceeding
+    await ensureConnection();
     
     const { email, password, appEndpoint, selectedRole } = req.body;
 

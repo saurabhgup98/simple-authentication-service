@@ -1,5 +1,6 @@
 import User from '../models/User.js';
 import { getAppIdentifier, isValidAppEndpoint } from './appMapping.js';
+import { ensureConnection } from './database.js';
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -28,6 +29,9 @@ const addAppRegistrationIfNeeded = async (user, appEndpoint, authMethod) => {
 
 const handleOAuth = async (provider, accessToken, refreshToken, profile, done) => {
     try {
+        // Ensure database connection before proceeding
+        await ensureConnection();
+        
         console.log(`${provider} OAuth profile:`, profile);
 
         const appEndpoint = profile.state || null;
